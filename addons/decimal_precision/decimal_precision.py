@@ -20,12 +20,18 @@ class decimal_precision(orm.Model):
     _sql_constraints = [
         ('name_uniq', 'unique (name)', """Only one value can be defined for each given usage!"""),
     ]
+    
+    precs = {
+        'Decimal Precision': 4,
+        'Payment Term': 6,
+    }
 
-    @tools.ormcache('application')
+    #@tools.ormcache('application')
     def precision_get(self, cr, uid, application):
-        cr.execute('select digits from decimal_precision where name=%s', (application,))
-        res = cr.fetchone()
-        return res[0] if res else 2
+        return self.precs[application] if application in self.precs else 2
+        #cr.execute('select digits from decimal_precision where name=%s', (application,))
+        #res = cr.fetchone()
+        #return res[0] if res else 2
 
     def clear_cache(self, cr):
         """ Deprecated, use `clear_caches` instead. """

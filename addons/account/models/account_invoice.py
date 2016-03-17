@@ -165,6 +165,7 @@ class AccountInvoice(models.Model):
                     'move_id': payment.move_id.id,
                     'ref': payment.move_id.ref,
                 })
+            print json.dumps(info)
             self.payments_widget = json.dumps(info)
 
     @api.one

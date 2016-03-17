@@ -171,6 +171,7 @@ class Registry(Mapping):
             # models register themselves in self.models
             model = cls._build_model(self, cr)
             if model._name not in models_to_load:
+                print 'load: %s-%s' % (module.name, model._name)
                 # avoid double-loading models whose declaration is split
                 models_to_load.append(model._name)
 

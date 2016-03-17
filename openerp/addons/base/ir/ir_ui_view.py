@@ -460,6 +460,19 @@ class view(osv.osv):
                 ['id', 'in', context.get('check_view_ids') or (0,)],
             ])
         view_ids = self.search(cr, uid, conditions, context=context)
+        
+        #if self.pool._init and not context.get('load_all_views'):
+        #    v_ids = []
+        #    for module in self.pool._init_modules:
+        #        names = tuple(res_id for (xmod, name), (model, res_id) in self.pool.model_data_reference_ids.items() if xmod == module and model == self._name)
+        #        if not names:
+        #            continue
+        #        for v in self.browse(cr, 1, view_ids, context):
+        #            if v.id in names:
+        #                v_ids.append(v.id)
+        #    view_ids =  v_ids 
+        #    print view_ids
+                
 
         return [(view.arch, view.id)
                 for view in self.browse(cr, 1, view_ids, context)
@@ -1189,6 +1202,7 @@ class view(osv.osv):
             # only validate the views that are still existing...
             xmlid_filter = "AND md.name IN %s"
             names = tuple(name for (xmod, name), (model, res_id) in self.pool.model_data_reference_ids.items() if xmod == module and model == self._name)
+            print names
             if not names:
                 # no views for this module, nothing to validate
                 return
