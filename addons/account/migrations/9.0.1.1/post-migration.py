@@ -65,7 +65,7 @@ def migrate_payment(cr, registry):
     cr.execute(""" select v.id, v.journal_id, v.type, v.date, v.reference, v.amount, v.payment_rate_currency_id,
                         v.company_id, v.partner_id, v.move_id, v.is_multi_currency, v.state, v.number
                     from account_voucher v join account_journal j on(v.journal_id=j.id) 
-                            where v.type in ('receipt','payment') and j.type in ('bank', 'cash') and v.amount > 0""" )
+                            where v.type in ('receipt','payment') and j.type in ('bank', 'cash') and v.amount != 0""" )
     voucher_ids = cr.fetchall()
     
 
@@ -145,89 +145,32 @@ def migrate_payment(cr, registry):
         logger.info("Payment Journal Items %s: %s ", a_payment_id, payment_move_lines)
         a_move_line_obj.write(cr, uid, payment_move_lines, {'payment_id': a_payment_id})
         
-        cr.execute(""" select distinct reconcile_ref from account_move_line
-                            where move_id = %s and reconcile_ref is not null""", 
-                            (voucher[9], ))
-        reconcile_refs = [x[0] for x in cr.fetchall()]
-        
-        for reconcile_ref in reconcile_refs:
-            cr.execute(""" select id, amount_currency from account_move_line 
-                            where  reconcile_ref = %s """, (reconcile_ref, ))
-            if bool(voucher[10]):
-                logger.info("Payment is_multi_currency true %s: %s ", a_payment_id, voucher[10])
-                reconcile_move_ids = [x[0] for x in cr.fetchall() if (float(x[1]) != 0.0)]
-            else:
-                logger.info("Payment is_multi_currency false %s: %s ", a_payment_id, voucher[10])
-                reconcile_move_ids = [x[0] for x in cr.fetchall()]
-            a_reconcile_lines = a_move_line_obj.browse(cr, uid, reconcile_move_ids)
-            result_reconcile_lines = a_reconcile_lines.auto_reconcile_lines()
-            logger.info("result_reconcile_lines %s: %s ", reconcile_ref, result_reconcile_lines.mapped('id'))
-        
         
 
-def migrate_payment_invoice(cr, registry):
+def migrate_reconciliation(cr, registry):
     """Create a Push rule for each pair of locations linked. Will break if
     there are multiple warehouses for the same company."""
     a_move_obj = registry['account.move']
     a_move_line_obj = registry['account.move.line']
-    a_payment_obj = registry['account.payment']
-    a_invoice_obj = registry['account.invoice']
-    a_journal_obj = registry['account.journal']
-    a_pay_meth_obj = registry['account.payment.method']
 
-    cr.execute('SELECT i.id, i.move_id FROM account_invoice i')
-    a_lines = cr.fetchall()
+    cr.execute(""" select id from account_move_reconcile """)
     
-
-    for invoice_id, move_id in a_lines:
-        invoice = a_invoice_obj.browse(cr, uid, invoice_id)
-        move = a_move_obj.browse(cr, uid, move_id)
-        partial_lines = lines = []
+    reconcile_ids = [x[0] for x in cr.fetchall()]
+    
+    for reconcile_id in reconcile_ids:
         
-        for line in move.line_ids:
-            if line.account_id != invoice.account_id:
-                continue
-            #move_line = a_move_line_obj.browse(cr, uid, line)
-            cr.execute(""" select l.id, journal_id, j.type, reconcile_id from account_move_line l, 
-                            account_journal j  where l.journal_id=j.id and  l.reconcile_id in (select reconcile_id 
-                        FROM account_move_line al, account_invoice i  
-                        WHERE al.move_id = i.move_id and al.id=%s)  and j.type in ('bank', 'cash')""" % line.id)
-            lines = lines + cr.fetchall()
-            cr.execute(""" select l.id, journal_id, j.type, reconcile_partial_id from account_move_line l, 
-                            account_journal j  where l.journal_id=j.id and  l.reconcile_partial_id in (select reconcile_id 
-                        FROM account_move_line al, account_invoice i  
-                        WHERE al.move_id = i.move_id and al.id=%s)  and j.type in ('bank', 'cash')""" % line.id)
-            lines = lines + cr.fetchall()
-        logger.info("lines reconciled %s: %s ", line, lines)
-        if not lines:
-        	continue
-
-        journal = a_journal_obj.browse(cr, uid, lines[0][1])
+        cr.execute(""" select id from account_move_line
+                            where openupgrade_legacy_9_0_reconcile_id = %s or openupgrade_legacy_9_0_reconcile_partial_id = %s""", 
+                            (reconcile_id, reconcile_id, ))
+    
         
-        payment_type = invoice.type in ('out_invoice', 'in_refund') and 'inbound' or 'outbound'
-        payment_method_id = PAYMENT_METHODS[lines[0][2]][payment_type]
-        journal_payment_methods = payment_type == 'inbound' and journal.inbound_payment_method_ids or journal.outbound_payment_method_ids
-        payment_method_id = journal_payment_methods[0].id
-        vals = {
-			'name': 'Draft Payment', # TODO: name by sequence
-            'journal_id': journal.id,
-            'payment_method_id': payment_method_id,
-            'payment_date': move.date,
-            'communication': invoice.reference,
-            'invoice_ids': [(4, invoice_id, None)],
-            'payment_type': payment_type,
-            'amount': move.amount,
-            'currency_id': invoice.currency_id.id,
-            'partner_id': invoice.partner_id.id,
-            'partner_type': MAP_INVOICE_TYPE_PARTNER_TYPE[invoice.type],
-            'company_id':move.company_id.id,
-        }
-        logger.info("Creating a payment: %s ", vals)
-        a_payment_id = a_payment_obj.create(cr, uid, vals)
-        for line in lines:
-            a_move_line_obj.write(cr, uid, [line[0]], {'payment_id': a_payment_id})
-            cr.execute("""INSERT INTO account_invoice_account_move_line_rel (%s, %s) """ % (invoice.id, line[0])) 
         
+        reconcile_move_ids = [x[0] for x in cr.fetchall()]
+        a_reconcile_lines = a_move_line_obj.browse(cr, uid, reconcile_move_ids)
+        logger.info("a_reconcile_lines %s: %s ", reconcile_id, a_reconcile_lines.mapped('id'))
+        result_reconcile_lines = a_reconcile_lines.auto_reconcile_lines()
+        logger.info("result_reconcile_lines %s: %s ", reconcile_id, result_reconcile_lines.mapped('id'))
+    
 @openupgrade.migrate()
 def migrate(cr, version):
     registry = RegistryManager.get(cr.dbname)
@@ -235,6 +178,7 @@ def migrate(cr, version):
     migrate_move_invoice(cr, registry)
     migrate_payment_method(cr, registry)
     migrate_payment(cr, registry)
+    migrate_reconciliation(cr, registry)
 	
     cr.execute("UPDATE wkf_instance SET state='active' where state='deactive'")
     
