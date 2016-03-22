@@ -1,4 +1,7 @@
 from openupgradelib import openupgrade
+import logging
+
+logger = logging.getLogger('OpenUpgrade.account')
 
 column_renames = {
     'account_account': [
@@ -67,7 +70,6 @@ column_renames = {
     ],
     'account_move': [
         ('balance', None),
-        ('line_id', None),
         ('period_id', None),
         ('to_check', None),
     ],
@@ -119,8 +121,31 @@ column_renames = {
     ],
 }
 
+def convert_field(cr, model, field, target_model, target_field):
+	logger.info("convert_field: %s-%s to  %s-%s", model, field, target_model, target_field)
+	cr.execute("UPDATE ir_model_fields set name=%s, model=%s WHERE model=%s AND name=%s", (target_field, target_model, model, field))
+
 @openupgrade.migrate()
 def migrate(cr, version):
+    openupgrade.rename_columns(cr, column_renames)
+    #openupgrade.rename_xmlids(cr, xmlid_renames)
+    
+    convert_field(cr, 'res.partner', 'property_account_payable', 'res.partner', 'property_account_payable_id')
+    convert_field(cr, 'res.partner', 'property_account_receivable', 'res.partner', 'property_account_receivable_id')
+    convert_field(cr, 'res.partner', 'property_account_position', 'res.partner', 'property_account_position_id')
+    convert_field(cr, 'res.partner', 'property_payment_term', 'res.partner', 'property_payment_term_id')
+    convert_field(cr, 'res.partner', 'property_supplier_payment_term', 'res.partner', 'property_supplier_payment_term_id')
+    convert_field(cr, 'account.chart.template', 'property_account_expense', 'account.chart.template', 'property_account_expense_id')
+    convert_field(cr, 'account.chart.template', 'property_account_expense_categ', 'account.chart.template', 'property_account_expense_categ_id')
+    convert_field(cr, 'account.chart.template', 'property_account_income', 'account.chart.template', 'property_account_income_id')
+    convert_field(cr, 'account.chart.template', 'property_account_income_categ', 'account.chart.template', 'property_account_income_categ_id')
+    convert_field(cr, 'account.chart.template', 'property_account_payable', 'account.chart.template', 'property_account_payable_id')
+    convert_field(cr, 'account.chart.template', 'property_account_receivable', 'account.chart.template', 'property_account_receivable_id')
+    convert_field(cr, 'product.category', 'property_account_expense_categ', 'product.category', 'property_account_expense_categ_id')
+    convert_field(cr, 'product.category', 'property_account_income_categ', 'product.category', 'property_account_income_categ_id')
+    convert_field(cr, 'product.category', 'property_account_expense', 'product.category', 'property_account_expense_id')
+    convert_field(cr, 'product.category', 'property_account_income', 'product.category', 'property_account_income_id')
+    
     cr.execute("UPDATE wkf_instance SET state='deactive' where state='active'")
     #'partner.view.button.journal_item_count'
     

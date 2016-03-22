@@ -134,6 +134,7 @@ class AccountInvoice(models.Model):
     @api.depends('payment_move_line_ids.amount_residual')
     def _get_payment_info_JSON(self):
         self.payments_widget = json.dumps(False)
+        print 'payment_move_line_ids: %s' % self.payment_move_line_ids
         if self.payment_move_line_ids:
             info = {'title': _('Less Payment'), 'outstanding': False, 'content': []}
             for payment in self.payment_move_line_ids:

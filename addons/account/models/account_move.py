@@ -1199,7 +1199,7 @@ class AccountPartialReconcile(models.Model):
     def create(self, vals):
         res = super(AccountPartialReconcile, self).create(vals)
         #eventually create a journal entry to book the difference due to foreign currency's exchange rate that fluctuates
-        res.create_exchange_rate_entry()
+        # res.create_exchange_rate_entry()
         return res
 
     @api.multi
