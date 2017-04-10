@@ -135,6 +135,9 @@ def active_field_template_func(cr, pool, id, vals):
 @openupgrade.migrate()
 def migrate(cr, version):
     pool = pooler.get_pool(cr.dbname)
+    cr.execute("""update product_template pt 
+                    set name= (select name from product_product p where pt.id=p.product_tmpl_id)  
+                    where name is null""")
     get_legacy_name = openupgrade.get_legacy_name
     openupgrade.move_field_m2o(
         cr, pool,
