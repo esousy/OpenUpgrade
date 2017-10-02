@@ -75,7 +75,7 @@ def initialize_sys_path():
     global hooked
 
     dd = tools.config.addons_data_dir
-    if dd not in ad_paths:
+    if os.access(dd, os.R_OK) and dd not in ad_paths:
         ad_paths.append(dd)
 
     for ad in tools.config['addons_path'].split(','):
@@ -102,7 +102,7 @@ def get_module_path(module, downloaded=False, display_warning=True):
     """
     initialize_sys_path()
     for adp in ad_paths:
-        if os.path.exists(opj(adp, module)) or os.path.exists(opj(adp, '%s.zip' % module)):
+        if os.path.exists(opj(adp, module, MANIFEST)) or os.path.exists(opj(adp, '%s.zip' % module)):
             return opj(adp, module)
 
     if downloaded:
@@ -315,6 +315,14 @@ def init_module_models(cr, module_name, obj_list):
         openerp.models.BaseModel.step_workflow = lambda *args, **kwargs: None
         # end OpenUpgrade
         obj_list[0].recompute(cr, openerp.SUPERUSER_ID, {})
+        # OpenUpgrade start, reset blacklists:
+        for obj in obj_list:
+            if obj._openupgrade_recompute_fields_blacklist:
+                obj._openupgrade_recompute_fields_blacklist = []
+                _logger.info(
+                    "Blacklist reset for model %s." % obj._name
+                )
+        # OpenUpgrade end
         # OpenUpgrade: reenable workflow triggers
         openerp.models.BaseModel.step_workflow = set_workflow_org
         # end OpenUpgrade

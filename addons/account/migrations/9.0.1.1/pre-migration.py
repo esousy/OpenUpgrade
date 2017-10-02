@@ -2,7 +2,9 @@
 # © 2016 Sylvain LE GAL <https://twitter.com/legalsylvain>
 # © 2016 Serpent Consulting Services Pvt. Ltd.
 # © 2016 Eficent Business and IT Consulting Services S.L.
+# Copyright 2017 Tecnativa - Pedro M. Baeza
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
+
 from openupgradelib import openupgrade
 
 column_renames = {
@@ -41,6 +43,9 @@ column_copies = {
         ('type_tax_use', None, None),
         ('type', None, None),
     ],
+    'account_invoice': [
+        ('reference', None, None),
+    ]
 }
 
 table_renames = [
@@ -64,7 +69,8 @@ PROPERTY_FIELDS = {
     ('res.partner', 'property_account_position',
      'property_account_position_id'),
     ('res.partner', 'property_payment_term', 'property_payment_term_id'),
-    ('res.partner', 'property_supplier_payment_term', 'property_supplier_payment_term_id'),
+    ('res.partner', 'property_supplier_payment_term',
+     'property_supplier_payment_term_id'),
 }
 
 
@@ -118,7 +124,8 @@ def remove_account_moves_from_special_periods(cr):
         AND fiscalyear_id = (SELECT id FROM account_fiscalyear
         ORDER BY date_start ASC LIMIT 1) ORDER BY date_start ASC LIMIT 1
     """)
-    first_nsp_id = cr.fetchone()[0] or False
+    first_nsp_id = cr.fetchone()
+    first_nsp_id = first_nsp_id and first_nsp_id[0]
 
     if first_nsp_id and move_ids:
         openupgrade.logged_query(cr, """
@@ -174,8 +181,70 @@ def map_account_tax_template_type(cr):
         table='account_tax_template', write='sql')
 
 
-@openupgrade.migrate()
-def migrate(cr, version):
+def blacklist_field_recomputation(env):
+    """Create computed fields that take long time to compute, but will be
+    filled with valid values by migration."""
+    from openerp.addons.account.models.account_move import \
+        AccountMove, AccountMoveLine
+    AccountMove._openupgrade_recompute_fields_blacklist = [
+        'currency_id',
+        'amount',
+        'matched_percentage',
+    ]
+    AccountMoveLine._openupgrade_recompute_fields_blacklist = [
+        'amount_residual',
+        'amount_residual_currency',
+        'reconciled',
+        'company_currency_id',
+        'balance',
+        'debit_cash_basis',
+        'credit_cash_basis',
+        'balance_cash_basis',
+        'user_type_id',
+    ]
+    from openerp.addons.account.models.account_invoice import \
+        AccountInvoice, AccountInvoiceLine
+    AccountInvoice._openupgrade_recompute_fields_blacklist = [
+        'payment_move_line_ids',
+        'residual',
+        'residual_signed',
+        'residual_company_signed',
+        'reconciled',
+    ]
+    AccountInvoiceLine._openupgrade_recompute_fields_blacklist = [
+        'price_subtotal_signed',
+        'currency_id',
+    ]
+
+
+def merge_supplier_invoice_refs(env):
+    """In v8, there are 2 fields for writing references:
+    supplier_invoice_number and reference. Now in v9 there's only the last one.
+    We merge the first field content in the second one for avoiding data loss.
+    Note that previously the `reference` field has been copied for preserving
+    the original field contents.
+    """
+    openupgrade.logged_query(
+        env.cr, """
+        UPDATE account_invoice
+        SET reference = supplier_invoice_number || ' - ' || reference
+        WHERE type IN ('in_invoice', 'in_refund')
+            AND reference IS NOT NULL
+            AND supplier_invoice_number IS NOT NULL"""
+    )
+    openupgrade.logged_query(
+        env.cr, """
+        UPDATE account_invoice
+        SET reference = supplier_invoice_number
+        WHERE type IN ('in_invoice', 'in_refund')
+            AND reference IS NULL
+            AND supplier_invoice_number IS NOT NULL"""
+    )
+
+
+@openupgrade.migrate(use_env=True)
+def migrate(env, version):
+    cr = env.cr
     # 9.0 introduces a constraint enforcing this
     cr.execute(
         "update account_account set reconcile=True "
@@ -190,3 +259,5 @@ def migrate(cr, version):
     map_account_tax_type(cr)
     map_account_tax_template_type(cr)
     remove_account_moves_from_special_periods(cr)
+    blacklist_field_recomputation(env)
+    merge_supplier_invoice_refs(env)

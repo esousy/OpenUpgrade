@@ -2,6 +2,8 @@
 # © 2016 Therp BV <http://therp.nl>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 from openupgradelib import openupgrade
+from openerp.addons.account_voucher.account_voucher import \
+    account_voucher_line
 
 
 def create_payments_from_vouchers(env):
@@ -28,7 +30,7 @@ def create_payments_from_vouchers(env):
             name, amount, payment_type, payment_reference
         )
         SELECT
-            av.id, av.create_date, av.comment, av.company_id,
+            av.id, av.create_date, COALESCE(av.name, av.comment), av.company_id,
             av.payment_rate_currency_id, av.partner_id,
             CASE
                WHEN av.voucher_type = 'receipt' THEN 'customer'
@@ -67,34 +69,18 @@ def create_payments_from_vouchers(env):
     # Statement below works because new payments have same id as old vouchers
     env.cr.execute(
         """\
-        WITH Q1 AS (
-            SELECT av.id as av_id, aml.id as aml_id
-            FROM account_move_line aml
-            INNER JOIN account_move am ON am.id = aml.move_id
-            INNER JOIN account_voucher av ON av.move_id = am.id
-        )
-        UPDATE account_move_line aml
+        UPDATE account_move_line aml2
         SET payment_id = av.id
-        FROM account_voucher_line avl
-        JOIN account_voucher av ON av.id = avl.voucher_id
-        WHERE avl.move_line_id = aml.id
-        AND av.voucher_type IN ('receipt', 'payment')
-        AND av.state IN ('draft', 'posted')
-        AND (aml.id IN (
-                SELECT credit_move_id
-                FROM account_partial_reconcile
-                WHERE debit_move_id IN (
-                    SELECT aml_id FROM Q1 WHERE av_id = av.id
-                )
-            ) OR
-            aml.id IN (
-                SELECT debit_move_id
-                FROM account_partial_reconcile
-                WHERE credit_move_id IN (
-                    SELECT aml_id FROM Q1 WHERE av_id = av.id
-                )
-            )
-        )
+        FROM account_voucher av
+        JOIN account_move am
+        ON am.id = av.move_id
+        JOIN account_move_line aml
+        ON am.id = aml.move_id
+        WHERE av.voucher_type IN ('receipt', 'payment')
+        AND (av.writeoff_acc_id != aml.account_id
+             OR av.writeoff_acc_id IS NULL)
+        AND av.state in ('draft', 'posted')
+        AND aml.id = aml2.id
         """
     )
     # Also recreate link from invoice to payment
@@ -126,3 +112,11 @@ def migrate(env, version):
     """Control function for account_voucher migration."""
     create_payments_from_vouchers(env)
     create_voucher_line_tax_lines(env)
+
+    if 'price_subtotal' in account_voucher_line._openupgrade_recompute_fields_blacklist:
+        # This means we have no taxes and we can update the price_subtotal
+        # quite simply.
+        openupgrade.logged_query(
+            env.cr,
+            'UPDATE account_voucher_line SET price_subtotal = quantity * price_unit'
+        )
