@@ -82,7 +82,7 @@ msgstr "Bedrijven"
 #. module: hr_timesheet_sheet
 #: model:ir.model.fields,field_description:hr_timesheet_sheet.field_hr_timesheet_sheet_sheet_company_id
 msgid "Company"
-msgstr "Bedijf"
+msgstr "Bedrijf"
 
 #. module: hr_timesheet_sheet
 #: model:ir.ui.view,arch_db:hr_timesheet_sheet.view_hr_timesheet_sheet_filter
@@ -278,7 +278,7 @@ msgstr "Open urenstaat"
 #: model:ir.model.fields,help:hr_timesheet_sheet.field_project_config_settings_timesheet_range
 #: model:ir.model.fields,help:hr_timesheet_sheet.field_res_company_timesheet_range
 msgid "Periodicity on which you validate your timesheets."
-msgstr "Frequentie waarmee u de urenstaten controleert."
+msgstr "Frequentie waarmee u de urenstaten bevestigd."
 
 #. module: hr_timesheet_sheet
 #: model:ir.model.fields,field_description:hr_timesheet_sheet.field_hr_timesheet_sheet_sheet_account_name
@@ -452,7 +452,7 @@ msgstr "Ongelezen berichten"
 #. module: hr_timesheet_sheet
 #: model:ir.ui.view,arch_db:hr_timesheet_sheet.view_hr_timesheet_sheet_filter
 msgid "Unvalidated Timesheets"
-msgstr "Niet gevalideerde urenstaten"
+msgstr "Niet bevestigde urenstaten"
 
 #. module: hr_timesheet_sheet
 #: model:ir.model.fields,field_description:hr_timesheet_sheet.field_hr_timesheet_sheet_sheet_user_id
@@ -489,6 +489,16 @@ msgid "You cannot duplicate a timesheet."
 msgstr "Het is niet mogelijk een urenstaat te dupliceren."
 
 #. module: hr_timesheet_sheet
+#: code:addons/hr_timesheet_sheet/models/hr_timesheet_sheet.py:85
+#, python-format
+msgid ""
+"You cannot have 2 timesheets that overlap!\n"
+"Please use the menu 'My Current Timesheet' to avoid this problem."
+msgstr ""
+"Het is niet toegestaan om 2 urenstaten te hebben die overlappen!\n"
+"U dient het menu \"Mijn huidige urenstaat\" te gebruiken om dit probleem te voorkomen."
+
+#. module: hr_timesheet_sheet
 #: code:addons/hr_timesheet_sheet/models/account_analytic_line.py:60
 #, python-format
 msgid "You cannot modify an entry in a confirmed timesheet."
@@ -503,7 +513,7 @@ msgid ""
 "                validated by a manager."
 msgstr ""
 "U moet uw urenstaat elke dag invullen en bevestigen op het einde\n"
-"van de week. Eenmaal de urenstaat bevestigd is, moet hij gevalideerd\n"
+"van de week. Eenmaal de urenstaat bevestigd is, moet hij bevestigd\n"
 "worden door een manager."
 
 #. module: hr_timesheet_sheet

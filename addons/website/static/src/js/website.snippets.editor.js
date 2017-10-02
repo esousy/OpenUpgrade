@@ -218,9 +218,6 @@ options.registry.carousel = options.registry.slider.extend({
 
         // set background and prepare to clean for save
         this.$target.on('slid.bs.carousel', function () {
-                self.editor.styles.background_position.$target = self.editor.styles.background.$target;
-                self.editor.styles.background_position.set_active();
-                self.editor.styles.background.$target.trigger("snippet-option-change", [self.editor.styles.background]);
             self.$target.carousel("pause");
             if (!self.editor) return;
 
@@ -231,6 +228,9 @@ options.registry.carousel = options.registry.slider.extend({
                 s_option.$target = self.$target.find(".item.active");
                 s_option.set_active();
                 s_option.$target.trigger("snippet-option-change", [s_option]);
+                if (opt_name === 'background') {
+                    s_option.bind_bg_events();
+                }
             });
         });
         this.$target.trigger('slid.bs.carousel');
@@ -311,8 +311,10 @@ options.registry.parallax = options.Class.extend({
             this.$target.data("snippet-view", new animation.registry.parallax(this.$target));
         }
         this.scroll();
-        this.buildingBlock.$el.on("snippet-dropped snippet-activated", this._refresh.bind(this));
-        this.$target.on('snippet-option-change snippet-option-preview', this._refresh.bind(this));
+
+        this._refresh_callback = this._refresh.bind(this);
+        this.buildingBlock.$el.on("snippet-dropped snippet-activated", this._refresh_callback);
+        this.$target.on('snippet-option-change snippet-option-preview', this._refresh_callback);
     },
     scroll: function (type, value) {
         this.$target.attr("data-scroll-background-ratio", value);
@@ -329,6 +331,11 @@ options.registry.parallax = options.Class.extend({
     on_move: function () {
         this._super.apply(this, arguments);
         this._refresh();
+    },
+    on_remove: function () {
+        this._super.apply(this, arguments);
+        this.$target.off("snippet-option-change snippet-option-preview", this._refresh_callback);
+        this.buildingBlock.$el.off("snippet-dropped snippet-activated", this._refresh_callback);
     },
 });
 

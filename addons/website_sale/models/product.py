@@ -19,7 +19,7 @@ class ProductPricelist(models.Model):
         return self.env['website'].search([], limit=1)
 
     website_id = fields.Many2one('website', string="website", default=_default_website)
-    code = fields.Char(string='E-commerce Promotional Code')
+    code = fields.Char(string='E-commerce Promotional Code', groups="base.group_user")
     selectable = fields.Boolean(help="Allow the end user to choose this price list")
 
     def clear_cache(self):
@@ -206,7 +206,6 @@ class Product(models.Model):
     def website_publish_button(self):
         self.ensure_one()
         return self.product_tmpl_id.website_publish_button()
-
 
 class ProductAttribute(models.Model):
     _inherit = "product.attribute"

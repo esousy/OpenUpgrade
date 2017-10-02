@@ -4,6 +4,9 @@
 import json
 import werkzeug
 import itertools
+import pytz
+import babel.dates
+from collections import OrderedDict
 
 from odoo import http, fields, _
 from odoo.addons.website.controllers.main import QueryURL
@@ -29,13 +32,20 @@ class WebsiteBlog(http.Controller):
             (r, label) = group['post_date']
             start, end = r.split('/')
             group['post_date'] = label
-            group['date_begin'] = fields.Date.to_string(self._to_date(start))
-            group['date_end'] = fields.Date.to_string(self._to_date(end))
-            group['month'] = self._to_date(start).strftime("%B")
-            group['year'] = self._to_date(start).strftime("%Y")
-        return {year: [m for m in months] for year, months in itertools.groupby(groups, lambda g: g['year'])}
+            group['date_begin'] = start
+            group['date_end'] = end
+
+            locale = request.context.get('lang', 'en_US')
+            start = pytz.UTC.localize(fields.Datetime.from_string(start))
+            tzinfo = pytz.timezone(request.context.get('tz', 'utc') or 'utc')
+
+            group['month'] = babel.dates.format_datetime(start, format='MMMM', tzinfo=tzinfo, locale=locale)
+            group['year'] = babel.dates.format_datetime(start, format='YYYY', tzinfo=tzinfo, locale=locale)
+
+        return OrderedDict((year, [m for m in months]) for year, months in itertools.groupby(groups, lambda g: g['year']))
 
     def _to_date(self, dt):
+        # TODO remove me in master/saas-14
         return fields.Date.from_string(dt)
 
     @http.route([
@@ -168,6 +178,7 @@ class WebsiteBlog(http.Controller):
         v['blog'] = blog
         v['base_url'] = request.env['ir.config_parameter'].get_param('web.base.url')
         v['posts'] = request.env['blog.post'].search([('blog_id','=', blog.id)], limit=min(int(limit), 50))
+        v['html2plaintext'] = html2plaintext
         r = request.render("website_blog.blog_feed", v, headers=[('Content-Type', 'application/atom+xml')])
         return r
 
@@ -312,7 +323,7 @@ class WebsiteBlog(http.Controller):
 
         :return redirect to the new blog created
         """
-        new_blog_post = request.env['blog.post'].with_context(mail_create_nosubscribe=True).copy(int(blog_post_id), {})
+        new_blog_post = request.env['blog.post'].with_context(mail_create_nosubscribe=True).browse(int(blog_post_id)).copy()
         return werkzeug.utils.redirect("/blog/%s/post/%s?enable_editor=1" % (slug(new_blog_post.blog_id), slug(new_blog_post)))
 
     @http.route('/blog/post_get_discussion/', type='json', auth="public", website=True)

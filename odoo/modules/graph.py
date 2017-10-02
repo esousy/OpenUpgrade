@@ -9,6 +9,7 @@ import itertools
 import zipimport
 
 import odoo
+import odoo.tools.safe_eval as safe_eval
 
 import odoo.osv as osv
 import odoo.tools as tools
@@ -89,7 +90,7 @@ class Graph(dict):
         forced_deps = tools.config.get_misc('openupgrade',
                                             'force_deps_' + release.version,
                                             forced_deps)
-        forced_deps = tools.safe_eval(forced_deps)
+        forced_deps = safe_eval(forced_deps)
 
         for module in module_list:
             # This will raise an exception if no/unreadable descriptor file.
@@ -99,7 +100,7 @@ class Graph(dict):
             if info and info['installable']:
                 info['depends'].extend(forced_deps.get(module, []))
                 packages.append((module, info)) # TODO directly a dict, like in get_modules_with_version
-            else:
+            elif module != 'studio_customization':
                 _logger.warning('module %s: not installable, skipped', module)
 
         dependencies = dict([(p, info['depends']) for p, info in packages])
@@ -131,10 +132,7 @@ class Graph(dict):
             unmet_deps = filter(lambda p: p not in self, dependencies[package])
             _logger.error('module %s: Unmet dependencies: %s', package, ', '.join(unmet_deps))
 
-        result = len(self) - len_graph
-        if result != len(module_list):
-            _logger.warning('Some modules were not loaded.')
-        return result
+        return len(self) - len_graph
 
 
     def __iter__(self):
